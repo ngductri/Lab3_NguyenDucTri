@@ -63,7 +63,7 @@ function ChatbotInterface({ messages, onSendMessage, isLoading }) {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyPress={handleKeyPress}
-          placeholder="Who would you like to invite?"
+          placeholder="Ask me to schedule a meeting..."
           className="chat-input"
           rows="2"
         />

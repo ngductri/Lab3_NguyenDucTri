@@ -1,79 +1,60 @@
-import React, { useState } from 'react';
-import ChatbotInterface from './components/ChatbotInterface';
-import './App.css';
+import React, { useState } from "react";
+import ChatbotInterface from "./ChatbotInterface";
 
 function App() {
-  const [messages, setMessages] = useState([
-    {
-      id: 1,
-      type: 'bot',
-      text: "Good morning. I can help you send meeting invitations. What's on your mind?",
-    }
-  ]);
+  const [messages, setMessages] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const [awaitingResponse, setAwaitingResponse] = useState(false);
-
-  const handleSendMessage = async (userMessage) => {
-    // Add user message
-    const newUserMessage = {
+  // 🔥 SEND MESSAGE TO BACKEND
+  const handleSendMessage = async (text) => {
+    const userMessage = {
       id: Date.now(),
-      type: 'user',
-      text: userMessage,
+      type: "user",
+      text: text,
     };
 
-    setMessages(prev => [...prev, newUserMessage]);
-    setAwaitingResponse(true);
+    setMessages((prev) => [...prev, userMessage]);
+    setIsLoading(true);
 
     try {
-      const history = messages.map((msg) => ({
-        role: msg.type === 'user' ? 'user' : 'assistant',
-        content: msg.text,
-      }));
-
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const res = await fetch("http://localhost:8000/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-          message: userMessage,
-          history,
+          message: text,
         }),
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Backend request failed');
-      }
+      const data = await res.json();
 
-      const data = await response.json();
-      const botResponse = {
+      const botMessage = {
         id: Date.now() + 1,
-        type: 'bot',
-        text: data.reply || 'I did not get a response. Please try again.',
+        type: "bot",
+        text: data.reply || "No response",
       };
 
-      setMessages(prev => [...prev, botResponse]);
-    } catch (error) {
-      const botResponse = {
+      setMessages((prev) => [...prev, botMessage]);
+    } catch (err) {
+      const errorMessage = {
         id: Date.now() + 1,
-        type: 'bot',
-        text: `Sorry, I ran into an error talking to the backend. ${error?.message || ''}`.trim(),
+        type: "bot",
+        text: "❌ Cannot connect to backend",
       };
-      setMessages(prev => [...prev, botResponse]);
-    } finally {
-      setAwaitingResponse(false);
+
+      setMessages((prev) => [...prev, errorMessage]);
     }
+
+    setIsLoading(false);
   };
 
   return (
-    <div className="app-container">
-      <div className="app-content">
-        <ChatbotInterface
-          messages={messages}
-          onSendMessage={handleSendMessage}
-          isLoading={awaitingResponse}
-        />
-      </div>
-    </div>
+    <ChatbotInterface
+      messages={messages}
+      onSendMessage={handleSendMessage}
+      isLoading={isLoading}
+    />
   );
 }
 

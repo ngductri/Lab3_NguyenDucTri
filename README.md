@@ -2,7 +2,7 @@
 
 ## Preview
 
-![UI Preview](/Users/pdpa/Desktop/VinAI/VinAI-day03-calendar-booking-agent/report/preview/lab03-preview.png)
+![UI Preview](VinAI-day03-calendar-booking-agent/report/preview/lab03-preview.png)
 
 ## Demo
 

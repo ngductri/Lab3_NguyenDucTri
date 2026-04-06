@@ -32,7 +32,14 @@ function ChatbotInterface({ messages, onSendMessage, isLoading }) {
   return (
     <div className="chatbot-container">
       <div className="chatbot-header">
-        <h1 className="chatbot-title">Calendar Booking Agent</h1>
+        <div className="chatbot-header-left">
+          <span className="chatbot-eyebrow">Scheduling assistant</span>
+          <h1 className="chatbot-title">Calendar Booking Agent</h1>
+        </div>
+        <div className="chatbot-header-right">
+          <span className="status-pill">Online</span>
+          <span className="status-pill muted">GMT+7</span>
+        </div>
       </div>
       <div className="messages-wrapper">
         <div className="messages-list">

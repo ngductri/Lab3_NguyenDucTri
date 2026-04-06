@@ -7,7 +7,7 @@ import uuid
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from agent import chat          # import the agentic loop
+from src.agent.agent import chat          # import the agentic loop
 
 app = FastAPI(title="Calendar Agent Server")
 

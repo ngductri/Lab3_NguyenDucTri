@@ -1,13 +1,23 @@
 import os
 import re
+import sys
+from pathlib import Path
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
+import uuid
 from datetime import datetime, timedelta
-
+from src.agent.agent import chat
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
+
+# Ensure src/ is on sys.path so we can import agent logic.
+SRC_DIR = Path(__file__).resolve().parents[1]
+if str(SRC_DIR) not in sys.path:
+    sys.path.append(str(SRC_DIR))
+
+from agent.agent import chat  # type: ignore
 
 # ================= CONFIG =================
 PORT = 8000
@@ -23,15 +33,27 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TOKEN_PATH = os.path.join(BASE_DIR, "token.json")
+
+if not os.path.exists(TOKEN_PATH):
+    raise Exception("token.json not found. Run auth.py first.")
+
+creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
+
 # ================= GOOGLE =================
 def get_calendar_service():
-    if not os.path.exists("token.json"):
+    if not os.path.exists(TOKEN_PATH):
         raise Exception("token.json not found. Run auth.py first.")
 
-    creds = Credentials.from_authorized_user_file("token.json", SCOPES)
+    creds = Credentials.from_authorized_user_file(TOKEN_PATH, SCOPES)
     return build("calendar", "v3", credentials=creds)
 
 # ================= SCHEMAS =================
+class ChatRequest(BaseModel):
+    message: str
+    session_id: Optional[str] = None
+
 class CheckReq(BaseModel):
     start_time: str
     end_time: str
@@ -42,6 +64,16 @@ class BookReq(BaseModel):
     end_time: str
     summary: Optional[str] = "Meeting"
     target_email: Optional[str] = None
+
+
+class ChatReq(BaseModel):
+    session_id: Optional[str] = None
+    message: str
+
+
+class ChatRes(BaseModel):
+    session_id: str
+    reply: str
 
 # ================= HELPERS =================
 
@@ -106,10 +138,43 @@ def ensure_valid_time(start: str, end: str):
     return start, end
 
 # ================= ROUTES =================
+@app.post("/api/chat")
+def chat_endpoint(req: ChatRequest):
+    try:
+        sid = req.session_id or "default"
+        history = sessions.get(sid, [])
+
+        reply, updated_history = chat(history, req.message)
+
+        sessions[sid] = updated_history
+
+        return {
+            "reply": reply,
+            "session_id": sid
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+# ---------- CHAT ----------
+# In-memory session store  {session_id: [history]}
+sessions: dict[str, list[dict]] = {}
+
+
+@app.post("/api/chat", response_model=ChatRes)
+def chat_api(req: ChatReq):
+    sid = req.session_id or str(uuid.uuid4())
+    history = sessions.get(sid, [])
+
+    reply, updated_history = chat(history, req.message)
+    sessions[sid] = updated_history
+
+    return ChatRes(session_id=sid, reply=reply)
 
 
 # ---------- CHECK ----------

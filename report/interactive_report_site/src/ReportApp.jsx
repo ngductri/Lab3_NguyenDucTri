@@ -1,396 +1,263 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import './ReportApp.css';
 
-const TEAM_SAMPLE = `{
-  "team": "Aurora Platform",
-  "period": "2026-03-01 to 2026-03-31",
-  "summary": "Shipped the shared auth layer, stabilized deployments, and reduced incident time-to-recover.",
-  "stats": {
-    "velocity": 42,
-    "bugs_closed": 18,
-    "on_time_pct": 92
+const GROUP_SAMPLE = `{
+  "title": "Lab 3 - Production-Grade Agentic System",
+  "teamName": "Aurora Agents",
+  "teamMembers": ["Nina Park", "Ravi Patel", "Kim Lee", "Alex Morgan"],
+  "deploymentDate": "2026-03-28",
+  "executiveSummary": "Built a robust ReAct agent that significantly outperforms the baseline chatbot on multi-step reasoning tasks by properly leveraging tools.",
+  "successRate": "85%",
+  "keyOutcome": "Our agent solved 40% more multi-step queries than the chatbot baseline by correctly utilizing the Search tool.",
+  "reactLoop": "The agent follows a classic ReAct loop: Thought → Action (tool call) → Observation → Repeat until final answer.",
+  "tools": [
+    { "name": "calc_tax", "inputFormat": "json", "useCase": "Calculate VAT based on country code" },
+    { "name": "search_api", "inputFormat": "string", "useCase": "Retrieve real-time information from Google Search" },
+    { "name": "web_browser", "inputFormat": "string", "useCase": "Navigate and extract content from specific URLs" }
+  ],
+  "llmPrimary": "GPT-4o",
+  "llmSecondary": "Gemini 1.5 Flash",
+  "telemetry": {
+    "avgLatencyP50": "1200ms",
+    "maxLatencyP99": "4500ms",
+    "avgTokensPerTask": "350",
+    "totalCost": "$0.05"
   },
-  "highlights": [
-    "Rolled out feature flags across three services",
-    "Improved build time by 27%",
-    "Launched the Q2 onboarding flow"
+  "rcaCases": [
+    {
+      "title": "Hallucinated Argument in calc_tax",
+      "input": "How much is the tax for 500 in Vietnam?",
+      "observation": "Agent called calc_tax(amount=500, region=\\\"Asia\\\")",
+      "rootCause": "The system prompt lacked enough Few-Shot examples for the tool's strict 2-letter country code format."
+    }
   ],
-  "milestones": [
-    { "title": "Auth service cutover", "status": "done", "date": "2026-03-08", "owner": "Nina" },
-    { "title": "SLO dashboard", "status": "in_progress", "date": "2026-03-22", "owner": "Ravi" },
-    { "title": "Data retention policy", "status": "blocked", "date": "2026-03-29", "owner": "Kim" }
+  "experiments": [
+    {
+      "title": "Prompt v1 vs Prompt v2",
+      "diff": "Added instruction: 'Always double check the tool arguments before calling'",
+      "result": "Reduced invalid tool call errors by 30%"
+    }
   ],
-  "risks": [
-    { "title": "Legacy token migration", "impact": "high", "mitigation": "Staged rollout with fallback" },
-    { "title": "Analytics pipeline lag", "impact": "medium", "mitigation": "Autoscale workers" }
+  "ablationTable": [
+    { "case": "Simple Q", "chatbot": "Correct", "agent": "Correct", "winner": "Draw" },
+    { "case": "Multi-step", "chatbot": "Hallucinated", "agent": "Correct", "winner": "Agent" }
   ],
-  "members": [
-    { "name": "Nina Park", "role": "Tech Lead", "focus": "Auth migration", "wins": ["Cutover completed", "Mentored two new hires"] },
-    { "name": "Ravi Patel", "role": "Backend", "focus": "Observability", "wins": ["SLO alerts tuned"] },
-    { "name": "Kim Lee", "role": "Platform", "focus": "Policy + compliance", "wins": ["Drafted retention plan"] }
-  ]
+  "productionReadiness": {
+    "security": "Input sanitization for tool arguments and rate limiting on external APIs.",
+    "guardrails": "Max 8 ReAct loops + timeout to prevent infinite loops and excessive billing.",
+    "scaling": "Ready to migrate to LangGraph for better state management and complex branching."
+  }
 }`;
-
-const INDIVIDUAL_SAMPLE = `{
-  "name": "Alex Morgan",
-  "role": "Product Designer",
-  "period": "2026-03-01 to 2026-03-31",
-  "summary": "Clarified the new invite flow and reduced drop-off in the scheduling funnel.",
-  "metrics": {
-    "design_reviews": 6,
-    "experiments": 3,
-    "handoffs": 4
-  },
-  "goals": [
-    "Ship the invitation recap screen",
-    "Improve accessibility for keyboard users"
-  ],
-  "tasks": [
-    { "title": "Prototype invite recap", "status": "done", "impact": "high", "notes": "Validated with 5 users" },
-    { "title": "Refine empty states", "status": "in_progress", "impact": "medium", "notes": "Needs copy review" },
-    { "title": "Accessibility audit", "status": "blocked", "impact": "high", "notes": "Waiting on tooling" }
-  ],
-  "collaboration": [
-    "Partnered with FE on motion guidelines",
-    "Worked with QA on usability checks"
-  ],
-  "next": [
-    "Finalize visual QA",
-    "Ship invite recap to beta users"
-  ]
-}`;
-
-const toLabel = (value) => value.replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase());
 
 function ReportApp() {
-  const [mode, setMode] = useState('team');
-  const [inputs, setInputs] = useState({
-    team: TEAM_SAMPLE,
-    individual: INDIVIDUAL_SAMPLE,
-  });
-  const [parseError, setParseError] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
-  const [taskFilter, setTaskFilter] = useState('all');
-  const [taskSearch, setTaskSearch] = useState('');
 
-  const currentInput = inputs[mode];
-
-  const parsedData = useMemo(() => {
+  const data = useMemo(() => {
     try {
-      const parsed = JSON.parse(currentInput);
-      setParseError('');
-      return parsed;
+      return JSON.parse(GROUP_SAMPLE);
     } catch (error) {
-      setParseError('Invalid JSON. Please fix formatting to preview the report.');
+      console.error("Failed to parse GROUP_SAMPLE:", error);
       return null;
     }
-  }, [currentInput]);
+  }, []);
 
-  const updateInput = (value) => {
-    setInputs((prev) => ({ ...prev, [mode]: value }));
+  const handleTabChange = (tab) => {
+    console.log(`Tab clicked: ${tab}`);   // ← You should see this in console now
+    setActiveTab(tab);
   };
 
-  const loadSample = () => {
-    setInputs((prev) => ({
-      ...prev,
-      [mode]: mode === 'team' ? TEAM_SAMPLE : INDIVIDUAL_SAMPLE,
-    }));
-  };
-
-  const filteredTasks = useMemo(() => {
-    if (!parsedData?.tasks) return [];
-    return parsedData.tasks.filter((task) => {
-      const matchesStatus = taskFilter === 'all' || task.status === taskFilter;
-      const matchesSearch = task.title.toLowerCase().includes(taskSearch.toLowerCase());
-      return matchesStatus && matchesSearch;
-    });
-  }, [parsedData, taskFilter, taskSearch]);
+  if (!data) {
+    return <div className="error-state">Error loading report data.</div>;
+  }
 
   return (
     <div className="report-app">
       <div className="report-bg" />
+
       <header className="hero">
         <div>
-          <p className="eyebrow">Interactive Report Console</p>
-          <h1>Team + Individual Reports from JSON</h1>
-          <p className="subtitle">
-            Paste JSON on the left, get a polished, share-ready report on the right.
-          </p>
-        </div>
-        <div className="mode-toggle">
-          <button
-            className={mode === 'team' ? 'active' : ''}
-            onClick={() => {
-              setMode('team');
-              setActiveTab('overview');
-            }}
-          >
-            Team Report
-          </button>
-          <button
-            className={mode === 'individual' ? 'active' : ''}
-            onClick={() => {
-              setMode('individual');
-              setActiveTab('overview');
-            }}
-          >
-            Individual Report
-          </button>
+          <p className="eyebrow">Group Lab Report</p>
+          <h1>{data.title}</h1>
+          <p className="subtitle">Production-Grade Agentic System</p>
         </div>
       </header>
 
-      <main className="report-grid">
-        <section className="panel input-panel">
-          <div className="panel-header">
-            <h2>JSON Input</h2>
-            <div className="panel-actions">
-              <button className="ghost" onClick={loadSample}>Load Sample</button>
-            </div>
-          </div>
-          <textarea
-            className="json-input"
-            value={currentInput}
-            onChange={(e) => updateInput(e.target.value)}
-            spellCheck={false}
-          />
-          {parseError && <p className="error-text">{parseError}</p>}
-          <div className="hint">
-            Use the sample structure as a guide. Extra fields are ignored.
+      <main className="report-container">
+        <section className="report-meta">
+          <div className="meta-grid">
+            <p><strong>Team:</strong> {data.teamName}</p>
+            <p><strong>Members:</strong> {data.teamMembers?.join(', ')}</p>
+            <p><strong>Deployment Date:</strong> {data.deploymentDate}</p>
           </div>
         </section>
 
-        <section className="panel output-panel">
-          <div className="panel-header">
-            <h2>Report Preview</h2>
-            <div className="tabs">
-              <button
-                className={activeTab === 'overview' ? 'active' : ''}
-                onClick={() => setActiveTab('overview')}
-              >
-                Overview
-              </button>
-              <button
-                className={activeTab === 'details' ? 'active' : ''}
-                onClick={() => setActiveTab('details')}
-              >
-                Details
-              </button>
-              <button
-                className={activeTab === 'next' ? 'active' : ''}
-                onClick={() => setActiveTab('next')}
-              >
-                Next Steps
-              </button>
-            </div>
-          </div>
+        <div className="tabs">
+          <button 
+            className={activeTab === 'overview' ? 'active' : ''}
+            onClick={() => handleTabChange('overview')}
+          >
+            Overview
+          </button>
+          <button 
+            className={activeTab === 'architecture' ? 'active' : ''}
+            onClick={() => handleTabChange('architecture')}
+          >
+            Architecture & Tooling
+          </button>
+          <button 
+            className={activeTab === 'analysis' ? 'active' : ''}
+            onClick={() => handleTabChange('analysis')}
+          >
+            Analysis & Experiments
+          </button>
+          <button 
+            className={activeTab === 'readiness' ? 'active' : ''}
+            onClick={() => handleTabChange('readiness')}
+          >
+            Production Readiness
+          </button>
+        </div>
 
-          {!parsedData && (
-            <div className="empty-state">
-              <h3>Waiting on valid JSON</h3>
-              <p>Fix the JSON on the left to see the report update live.</p>
-            </div>
+        <div className="report-body">
+          {activeTab === 'overview' && (
+            <>
+              <div className="summary-card">
+                <h4>1. Executive Summary</h4>
+                <p>{data.executiveSummary}</p>
+              </div>
+              <div className="stat-grid">
+                <div className="stat-card">
+                  <p className="stat-label">Success Rate</p>
+                  <p className="stat-value big">{data.successRate}</p>
+                </div>
+                <div className="stat-card">
+                  <p className="stat-label">Key Outcome</p>
+                  <p className="stat-value outcome">{data.keyOutcome}</p>
+                </div>
+              </div>
+            </>
           )}
 
-          {parsedData && mode === 'team' && (
-            <div className="report-body">
-              <section className="report-header">
-                <div>
-                  <h3>{parsedData.team}</h3>
-                  <p className="meta">{parsedData.period}</p>
-                </div>
-                <div className="chip-row">
-                  {(parsedData.highlights || []).slice(0, 2).map((item) => (
-                    <span key={item} className="chip">{item}</span>
-                  ))}
-                </div>
-              </section>
+          {activeTab === 'architecture' && (
+            <>
+              <div className="list-card">
+                <h4>2.1 ReAct Loop Implementation</h4>
+                <p>{data.reactLoop}</p>
+              </div>
 
-              {activeTab === 'overview' && (
-                <>
-                  <div className="summary-card">
-                    <h4>Summary</h4>
-                    <p>{parsedData.summary}</p>
-                  </div>
-
-                  <div className="stat-grid">
-                    {parsedData.stats &&
-                      Object.entries(parsedData.stats).map(([key, value]) => (
-                        <div key={key} className="stat-card">
-                          <p className="stat-label">{toLabel(key)}</p>
-                          <p className="stat-value">{value}</p>
-                        </div>
-                      ))}
-                  </div>
-
-                  <div className="list-card">
-                    <h4>Highlights</h4>
-                    <div className="list">
-                      {(parsedData.highlights || []).map((item) => (
-                        <div key={item} className="list-item">{item}</div>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {activeTab === 'details' && (
-                <>
-                  <div className="list-card">
-                    <h4>Milestones</h4>
-                    <div className="card-list">
-                      {(parsedData.milestones || []).map((item) => (
-                        <div key={item.title} className="row-card">
-                          <div>
-                            <p className="row-title">{item.title}</p>
-                            <p className="meta">{item.owner} · {item.date}</p>
-                          </div>
-                          <span className={`status ${item.status}`}>{toLabel(item.status)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="list-card">
-                    <h4>Risks</h4>
-                    <div className="card-list">
-                      {(parsedData.risks || []).map((item) => (
-                        <div key={item.title} className="row-card">
-                          <div>
-                            <p className="row-title">{item.title}</p>
-                            <p className="meta">{item.mitigation}</p>
-                          </div>
-                          <span className={`impact ${item.impact}`}>{toLabel(item.impact)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {activeTab === 'next' && (
-                <div className="list-card">
-                  <h4>Team Focus</h4>
-                  <div className="card-list">
-                    {(parsedData.members || []).map((member) => (
-                      <div key={member.name} className="member-card">
-                        <div>
-                          <p className="row-title">{member.name}</p>
-                          <p className="meta">{member.role} · {member.focus}</p>
-                        </div>
-                        <div className="chip-row">
-                          {(member.wins || []).map((win) => (
-                            <span key={win} className="chip chip-soft">{win}</span>
-                          ))}
-                        </div>
-                      </div>
+              <div className="list-card">
+                <h4>2.2 Tool Definitions (Inventory)</h4>
+                <table className="tool-table">
+                  <thead>
+                    <tr>
+                      <th>Tool Name</th>
+                      <th>Input Format</th>
+                      <th>Use Case</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(data.tools || []).map((tool, i) => (
+                      <tr key={i}>
+                        <td><code>{tool.name}</code></td>
+                        <td>{tool.inputFormat}</td>
+                        <td>{tool.useCase}</td>
+                      </tr>
                     ))}
-                  </div>
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="list-card">
+                <h4>2.3 LLM Providers Used</h4>
+                <p><strong>Primary:</strong> {data.llmPrimary}</p>
+                {data.llmSecondary && <p><strong>Secondary:</strong> {data.llmSecondary}</p>}
+              </div>
+
+              <div className="list-card">
+                <h4>3. Telemetry & Performance Dashboard</h4>
+                <div className="stat-grid">
+                  <div className="stat-card"><p className="stat-label">Avg Latency (P50)</p><p className="stat-value">{data.telemetry?.avgLatencyP50}</p></div>
+                  <div className="stat-card"><p className="stat-label">Max Latency (P99)</p><p className="stat-value">{data.telemetry?.maxLatencyP99}</p></div>
+                  <div className="stat-card"><p className="stat-label">Avg Tokens per Task</p><p className="stat-value">{data.telemetry?.avgTokensPerTask}</p></div>
+                  <div className="stat-card"><p className="stat-label">Total Cost</p><p className="stat-value">{data.telemetry?.totalCost}</p></div>
                 </div>
-              )}
-            </div>
+              </div>
+            </>
           )}
 
-          {parsedData && mode === 'individual' && (
-            <div className="report-body">
-              <section className="report-header">
-                <div>
-                  <h3>{parsedData.name}</h3>
-                  <p className="meta">{parsedData.role} · {parsedData.period}</p>
-                </div>
-                <div className="chip-row">
-                  {(parsedData.goals || []).slice(0, 2).map((item) => (
-                    <span key={item} className="chip">{item}</span>
-                  ))}
-                </div>
-              </section>
-
-              {activeTab === 'overview' && (
-                <>
-                  <div className="summary-card">
-                    <h4>Summary</h4>
-                    <p>{parsedData.summary}</p>
+          {activeTab === 'analysis' && (
+            <>
+              <div className="list-card">
+                <h4>4. Root Cause Analysis (RCA)</h4>
+                {(data.rcaCases || []).map((rca, i) => (
+                  <div key={i} className="rca-card">
+                    <h5>Case Study: {rca.title}</h5>
+                    <p><strong>Input:</strong> "{rca.input}"</p>
+                    <p><strong>Observation:</strong> {rca.observation}</p>
+                    <p><strong>Root Cause:</strong> {rca.rootCause}</p>
                   </div>
+                ))}
+              </div>
 
-                  <div className="stat-grid">
-                    {parsedData.metrics &&
-                      Object.entries(parsedData.metrics).map(([key, value]) => (
-                        <div key={key} className="stat-card">
-                          <p className="stat-label">{toLabel(key)}</p>
-                          <p className="stat-value">{value}</p>
-                        </div>
-                      ))}
+              <div className="list-card">
+                <h4>5. Ablation Studies & Experiments</h4>
+                {(data.experiments || []).map((exp, i) => (
+                  <div key={i} className="experiment-card">
+                    <h5>{exp.title}</h5>
+                    <p><strong>Change:</strong> {exp.diff}</p>
+                    <p><strong>Result:</strong> {exp.result}</p>
                   </div>
+                ))}
 
+                {data.ablationTable && (
                   <div className="list-card">
-                    <h4>Goals</h4>
-                    <div className="list">
-                      {(parsedData.goals || []).map((item) => (
-                        <div key={item} className="list-item">{item}</div>
-                      ))}
-                    </div>
+                    <h5>Chatbot vs Agent Comparison</h5>
+                    <table className="tool-table">
+                      <thead>
+                        <tr>
+                          <th>Case</th>
+                          <th>Chatbot</th>
+                          <th>Agent</th>
+                          <th>Winner</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.ablationTable.map((row, i) => (
+                          <tr key={i}>
+                            <td>{row.case}</td>
+                            <td>{row.chatbot}</td>
+                            <td>{row.agent}</td>
+                            <td><strong>{row.winner}</strong></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                </>
-              )}
+                )}
+              </div>
+            </>
+          )}
 
-              {activeTab === 'details' && (
-                <>
-                  <div className="task-filters">
-                    <input
-                      className="task-search"
-                      value={taskSearch}
-                      onChange={(e) => setTaskSearch(e.target.value)}
-                      placeholder="Search tasks"
-                    />
-                    <select
-                      className="task-select"
-                      value={taskFilter}
-                      onChange={(e) => setTaskFilter(e.target.value)}
-                    >
-                      <option value="all">All</option>
-                      <option value="done">Done</option>
-                      <option value="in_progress">In Progress</option>
-                      <option value="blocked">Blocked</option>
-                    </select>
-                  </div>
-
-                  <div className="card-list">
-                    {filteredTasks.map((task) => (
-                      <div key={task.title} className="task-card">
-                        <div>
-                          <p className="row-title">{task.title}</p>
-                          <p className="meta">{task.notes}</p>
-                        </div>
-                        <div className="chip-row">
-                          <span className={`status ${task.status}`}>{toLabel(task.status)}</span>
-                          <span className={`impact ${task.impact}`}>{toLabel(task.impact)}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {activeTab === 'next' && (
-                <div className="list-card">
-                  <h4>Next Steps</h4>
-                  <div className="list">
-                    {(parsedData.next || []).map((item) => (
-                      <div key={item} className="list-item">{item}</div>
-                    ))}
-                  </div>
-                  <div className="list-card nested">
-                    <h4>Collaboration</h4>
-                    <div className="list">
-                      {(parsedData.collaboration || []).map((item) => (
-                        <div key={item} className="list-item">{item}</div>
-                      ))}
-                    </div>
-                  </div>
+          {activeTab === 'readiness' && (
+            <div className="list-card">
+              <h4>6. Production Readiness Review</h4>
+              <div className="readiness-grid">
+                <div className="readiness-item">
+                  <strong>Security</strong>
+                  <p>{data.productionReadiness?.security}</p>
                 </div>
-              )}
+                <div className="readiness-item">
+                  <strong>Guardrails</strong>
+                  <p>{data.productionReadiness?.guardrails}</p>
+                </div>
+                <div className="readiness-item">
+                  <strong>Scaling</strong>
+                  <p>{data.productionReadiness?.scaling}</p>
+                </div>
+              </div>
             </div>
           )}
-        </section>
+        </div>
       </main>
     </div>
   );

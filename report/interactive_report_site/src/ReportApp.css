@@ -39,6 +39,119 @@ body {
   padding: 48px 6vw 80px;
 }
 
+/* ==================== NEW LAYOUT FOR SINGLE REPORT ==================== */
+
+.report-container {
+  position: relative;
+  z-index: 1;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.report-meta {
+  background: var(--color-panel);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--color-border);
+  padding: 20px 24px;
+  margin-bottom: 24px;
+  box-shadow: var(--shadow-card);
+}
+
+.meta-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  font-size: 15px;
+}
+
+.meta-grid p {
+  margin: 0;
+}
+
+/* Make tabs more clickable */
+.tabs {
+  display: inline-flex;
+  background: #F1EFEA;
+  border-radius: 999px;
+  padding: 5px;
+  gap: 4px;
+  margin-bottom: 28px;
+  box-shadow: 0 4px 12px rgba(18, 19, 26, 0.06);
+}
+
+.tabs button {
+  padding: 10px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 140px;
+}
+
+.tabs button:hover {
+  background: rgba(255,255,255,0.6);
+}
+
+.tabs button.active {
+  background: white;
+  color: var(--color-ink);
+  box-shadow: var(--shadow-soft);
+}
+
+/* Ensure report body has proper spacing */
+.report-body {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+/* Make sure rca and experiment cards look good */
+.rca-card, .experiment-card {
+  background: #F9F8F5;
+  padding: 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  margin-bottom: 16px;
+}
+
+.readiness-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.readiness-item {
+  background: #F9F8F5;
+  padding: 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+}
+
+.tool-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 8px;
+}
+
+.tool-table th, .tool-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.tool-table th {
+  background: #F1EFEA;
+  font-weight: 600;
+}
+
+/* Remove old grid that was causing layout issues */
+.report-grid {
+  display: none;   /* safely hide old grid */
+}
+
 .report-bg {
   position: absolute;
   inset: 0;
